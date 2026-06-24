@@ -8,3 +8,4 @@
 - [x] Add native PowerShell and cmd setup scripts for Windows
 - [x] Update README.md to Vietnamese and add detailed installation guide
 - [x] Fix default push branch detection
+- [x] Fix Windows Task Scheduler docs and registration scripts to avoid duplicate loop scheduling

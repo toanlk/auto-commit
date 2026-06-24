@@ -10,6 +10,8 @@ param(
     [string[]]$RunnerPrefixArgs = @()
 )
 
+$toolRepoPath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+
 if (-not (Test-Path $RepoPath)) {
     throw "Repository path does not exist: $RepoPath"
 }
@@ -44,8 +46,7 @@ $taskArguments = @($RunnerPrefixArgs) + @(
     "git-auto-commit",
     "--repo",
     $RepoPath,
-    "--interval",
-    $IntervalSeconds.ToString(),
+    "--once",
     "--branch",
     $Branch,
     "--remote",
@@ -53,21 +54,61 @@ $taskArguments = @($RunnerPrefixArgs) + @(
 )
 
 $taskActionArgs = ($taskArguments | ForEach-Object { Quote-TaskArgument $_ }) -join " "
-$action = New-ScheduledTaskAction -Execute $runnerExecutable -Argument $taskActionArgs -WorkingDirectory $RepoPath
+$intervalIso = "PT{0}S" -f $IntervalSeconds
+$taskDescription = "Automatically git add, commit, and push changes for $RepoPath"
 
-$startTime = (Get-Date).AddMinutes(1)
-$trigger = New-ScheduledTaskTrigger `
-    -Once `
-    -At $startTime `
-    -RepetitionInterval (New-TimeSpan -Seconds $IntervalSeconds) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)
+function Escape-XmlValue {
+    param([string]$Value)
 
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    return [System.Security.SecurityElement]::Escape($Value)
+}
+
+$taskXml = @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>$(Escape-XmlValue $taskDescription)</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <BootTrigger>
+      <Enabled>true</Enabled>
+      <Repetition>
+        <Interval>$intervalIso</Interval>
+        <Duration>P9999D</Duration>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+    </BootTrigger>
+  </Triggers>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>$(Escape-XmlValue $runnerExecutable)</Command>
+      <Arguments>$(Escape-XmlValue $taskActionArgs)</Arguments>
+      <WorkingDirectory>$(Escape-XmlValue $toolRepoPath)</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>
+"@
 
 Register-ScheduledTask `
     -TaskName $TaskName `
-    -Action $action `
-    -Trigger $trigger `
-    -Settings $settings `
-    -Description "Automatically git add, commit, and push changes for $RepoPath" `
+    -Xml $taskXml `
     -Force

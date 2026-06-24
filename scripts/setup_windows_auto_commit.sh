@@ -6,20 +6,60 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 TASK_NAME="${TASK_NAME:-GitAutoCommitPush}"
+TARGET_REPO_PATH="${TARGET_REPO_PATH:-}"
 BRANCH="${BRANCH:-main}"
 REMOTE="${REMOTE:-origin}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-60}"
 POETRY_COMMAND="${POETRY_COMMAND:-poetry}"
+
+while (($#)); do
+    case "$1" in
+        --repo)
+            TARGET_REPO_PATH="${2:-}"
+            shift 2
+            ;;
+        --task-name)
+            TASK_NAME="${2:-}"
+            shift 2
+            ;;
+        --branch)
+            BRANCH="${2:-}"
+            shift 2
+            ;;
+        --remote)
+            REMOTE="${2:-}"
+            shift 2
+            ;;
+        --interval)
+            INTERVAL_SECONDS="${2:-}"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+done
 
 if [[ "${INTERVAL_SECONDS}" -lt 60 ]]; then
     echo "INTERVAL_SECONDS must be at least 60." >&2
     exit 1
 fi
 
+if [[ -z "${TARGET_REPO_PATH}" ]]; then
+    echo "Usage: ./scripts/setup_windows_auto_commit.sh --repo /path/to/target/repo [--branch main] [--interval 60]" >&2
+    exit 1
+fi
+
+if [[ ! -d "${TARGET_REPO_PATH}" ]]; then
+    echo "Target repository path does not exist: ${TARGET_REPO_PATH}" >&2
+    exit 1
+fi
+
 if command -v cygpath >/dev/null 2>&1; then
-    WINDOWS_REPO_PATH="$(cygpath -w "${REPO_DIR}")"
+    WINDOWS_REPO_PATH="$(cygpath -w "${TARGET_REPO_PATH}")"
 elif pwd -W >/dev/null 2>&1; then
-    WINDOWS_REPO_PATH="$(cd "${REPO_DIR}" && pwd -W)"
+    WINDOWS_REPO_PATH="$(cd "${TARGET_REPO_PATH}" && pwd -W)"
 else
     echo "This script must run from Git Bash or an environment with cygpath/pwd -W." >&2
     exit 1
