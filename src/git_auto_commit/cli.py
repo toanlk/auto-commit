@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Seconds between sync cycles in loop mode.",
     )
     parser.add_argument("--remote", default="origin", help="Remote name to push to.")
-    parser.add_argument("--branch", default="main", help="Branch name to push to.")
+    parser.add_argument("--branch", default=None, help="Branch name to push to. Defaults to the current branch.")
     parser.add_argument(
         "--message-template",
         default="Auto commit {timestamp}",

@@ -12,6 +12,7 @@ from git_auto_commit.service import (
     GitAutoCommitError,
     commit_changes,
     ensure_git_repository,
+    get_current_branch,
     run_cycle,
 )
 
@@ -63,6 +64,35 @@ def test_run_cycle_commits_and_pushes() -> None:
         changed = run_cycle(config, logger, now=datetime(2026, 6, 23, 10, 11, 12))
 
     assert changed is True
+
+
+def test_run_cycle_pushes_current_branch_by_default() -> None:
+    logger = logging.getLogger("test")
+    config = AutoCommitConfig(repo_path=Path("."))
+    with patch(
+        "git_auto_commit.service.run_git_command",
+        side_effect=[
+            make_completed_process(0, stdout="true\n"),
+            make_completed_process(0),
+            make_completed_process(1),
+            make_completed_process(0, stdout="[develop abc] Auto commit"),
+            make_completed_process(0, stdout="develop\n"),
+            make_completed_process(0, stdout="pushed"),
+        ],
+    ) as runner:
+        changed = run_cycle(config, logger, now=datetime(2026, 6, 23, 10, 11, 12))
+
+    assert changed is True
+    assert runner.call_args_list[-1].args == (Path("."), "push", "origin", "develop")
+
+
+def test_get_current_branch_raises_for_detached_head() -> None:
+    with patch(
+        "git_auto_commit.service.run_git_command",
+        return_value=make_completed_process(0, stdout=""),
+    ):
+        with pytest.raises(GitAutoCommitError, match="detached HEAD"):
+            get_current_branch(Path("."))
 
 
 def test_run_cycle_skips_push_when_clean() -> None:

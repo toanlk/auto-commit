@@ -18,7 +18,7 @@ class AutoCommitConfig:
     repo_path: Path
     interval_seconds: int = 60
     remote: str = "origin"
-    branch: str = "main"
+    branch: str | None = None
     commit_message_template: str = "Auto commit {timestamp}"
     push_when_clean: bool = False
 
@@ -71,8 +71,25 @@ def commit_changes(config: AutoCommitConfig, now: datetime | None = None) -> boo
     return True
 
 
-def push_changes(config: AutoCommitConfig) -> None:
-    result = run_git_command(config.repo_path, "push", config.remote, config.branch)
+def get_current_branch(repo_path: Path) -> str:
+    result = run_git_command(repo_path, "branch", "--show-current")
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip() or "Could not determine current branch."
+        raise GitAutoCommitError(stderr)
+
+    branch = result.stdout.strip()
+    if not branch:
+        raise GitAutoCommitError("Could not determine current branch. Use --branch when in detached HEAD.")
+    return branch
+
+
+def resolve_push_branch(config: AutoCommitConfig) -> str:
+    return config.branch or get_current_branch(config.repo_path)
+
+
+def push_changes(config: AutoCommitConfig, branch: str | None = None) -> None:
+    branch = branch or resolve_push_branch(config)
+    result = run_git_command(config.repo_path, "push", config.remote, branch)
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip() or "git push failed."
         raise GitAutoCommitError(stderr)
@@ -88,13 +105,15 @@ def run_cycle(
     committed = commit_changes(config, now=now)
 
     if committed:
-        logger.info("Created commit and pushing to %s/%s.", config.remote, config.branch)
-        push_changes(config)
+        branch = resolve_push_branch(config)
+        logger.info("Created commit and pushing to %s/%s.", config.remote, branch)
+        push_changes(config, branch=branch)
         return True
 
     if config.push_when_clean:
-        logger.info("No staged changes; pushing anyway to %s/%s.", config.remote, config.branch)
-        push_changes(config)
+        branch = resolve_push_branch(config)
+        logger.info("No staged changes; pushing anyway to %s/%s.", config.remote, branch)
+        push_changes(config, branch=branch)
     else:
         logger.info("No changes detected; skipping commit and push.")
 
