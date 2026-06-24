@@ -1,0 +1,1 @@
+"""Git auto commit package."""

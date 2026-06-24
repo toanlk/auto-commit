@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "git-auto-commit-push"
+version = "0.1.0"
+description = "Windows-friendly Git auto commit and push utility."
+authors = ["OpenAI Codex <codex@openai.com>"]
+readme = "README.md"
+packages = [{ include = "git_auto_commit", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+
+[tool.poetry.scripts]
+git-auto-commit = "git_auto_commit.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
