@@ -57,6 +57,24 @@ $taskActionArgs = ($taskArguments | ForEach-Object { Quote-TaskArgument $_ }) -j
 $intervalIso = "PT{0}S" -f $IntervalSeconds
 $taskDescription = "Automatically git add, commit, and push changes for $RepoPath"
 
+$vbsDir = Join-Path $env:LOCALAPPDATA "GitAutoCommit"
+if (-not (Test-Path $vbsDir)) {
+    New-Item -Path $vbsDir -ItemType Directory -Force | Out-Null
+}
+$vbsPath = Join-Path $vbsDir "$TaskName.vbs"
+
+$fullCommand = '"{0}" {1}' -f $runnerExecutable, $taskActionArgs
+$vbsEscapedCommand = $fullCommand -replace '"', '""'
+$vbsEscapedWorkDir = $toolRepoPath -replace '"', '""'
+
+@"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = "$vbsEscapedWorkDir"
+WshShell.Run "$vbsEscapedCommand", 0, True
+"@ | Set-Content -Path $vbsPath -Encoding ASCII
+
+$vbsArg = '"{0}"' -f $vbsPath
+
 function Escape-XmlValue {
     param([string]$Value)
 
@@ -100,8 +118,8 @@ $taskXml = @"
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>$(Escape-XmlValue $runnerExecutable)</Command>
-      <Arguments>$(Escape-XmlValue $taskActionArgs)</Arguments>
+      <Command>wscript.exe</Command>
+      <Arguments>$(Escape-XmlValue $vbsArg)</Arguments>
       <WorkingDirectory>$(Escape-XmlValue $toolRepoPath)</WorkingDirectory>
     </Exec>
   </Actions>

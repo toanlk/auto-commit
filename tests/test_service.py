@@ -56,6 +56,7 @@ def test_run_cycle_commits_and_pushes() -> None:
         side_effect=[
             make_completed_process(0, stdout="true\n"),
             make_completed_process(0),
+            make_completed_process(0),
             make_completed_process(1),
             make_completed_process(0, stdout="[main abc] Auto commit"),
             make_completed_process(0, stdout="pushed"),
@@ -73,10 +74,11 @@ def test_run_cycle_pushes_current_branch_by_default() -> None:
         "git_auto_commit.service.run_git_command",
         side_effect=[
             make_completed_process(0, stdout="true\n"),
+            make_completed_process(0, stdout="develop\n"),
+            make_completed_process(0),
             make_completed_process(0),
             make_completed_process(1),
             make_completed_process(0, stdout="[develop abc] Auto commit"),
-            make_completed_process(0, stdout="develop\n"),
             make_completed_process(0, stdout="pushed"),
         ],
     ) as runner:
@@ -102,6 +104,8 @@ def test_run_cycle_skips_push_when_clean() -> None:
         "git_auto_commit.service.run_git_command",
         side_effect=[
             make_completed_process(0, stdout="true\n"),
+            make_completed_process(0, stdout="main\n"),
+            make_completed_process(0),
             make_completed_process(0),
             make_completed_process(0),
         ],
@@ -109,4 +113,4 @@ def test_run_cycle_skips_push_when_clean() -> None:
         changed = run_cycle(config, logger)
 
     assert changed is False
-    assert runner.call_count == 3
+    assert runner.call_count == 5

@@ -87,6 +87,16 @@ def resolve_push_branch(config: AutoCommitConfig) -> str:
     return config.branch or get_current_branch(config.repo_path)
 
 
+def pull_changes(config: AutoCommitConfig, branch: str | None = None) -> None:
+    branch = branch or resolve_push_branch(config)
+    result = run_git_command(
+        config.repo_path, "pull", "--rebase", config.remote, branch,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip() or "git pull failed."
+        raise GitAutoCommitError(stderr)
+
+
 def push_changes(config: AutoCommitConfig, branch: str | None = None) -> None:
     branch = branch or resolve_push_branch(config)
     result = run_git_command(config.repo_path, "push", config.remote, branch)
@@ -101,17 +111,20 @@ def run_cycle(
     now: datetime | None = None,
 ) -> bool:
     ensure_git_repository(config.repo_path)
+    branch = resolve_push_branch(config)
+
+    logger.info("Pulling from %s/%s.", config.remote, branch)
+    pull_changes(config, branch=branch)
+
     stage_all_changes(config.repo_path)
     committed = commit_changes(config, now=now)
 
     if committed:
-        branch = resolve_push_branch(config)
         logger.info("Created commit and pushing to %s/%s.", config.remote, branch)
         push_changes(config, branch=branch)
         return True
 
     if config.push_when_clean:
-        branch = resolve_push_branch(config)
         logger.info("No staged changes; pushing anyway to %s/%s.", config.remote, branch)
         push_changes(config, branch=branch)
     else:
