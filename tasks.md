@@ -9,3 +9,4 @@
 - [x] Update README.md to Vietnamese and add detailed installation guide
 - [x] Fix default push branch detection
 - [x] Fix Windows Task Scheduler docs and registration scripts to avoid duplicate loop scheduling
+- [x] Change Windows setup scheduler fallback branch to master

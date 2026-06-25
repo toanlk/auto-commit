@@ -7,7 +7,7 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 TASK_NAME="${TASK_NAME:-GitAutoCommitPush}"
 TARGET_REPO_PATH="${TARGET_REPO_PATH:-}"
-BRANCH="${BRANCH:-main}"
+BRANCH="${BRANCH:-master}"
 REMOTE="${REMOTE:-origin}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-60}"
 POETRY_COMMAND="${POETRY_COMMAND:-poetry}"
@@ -47,7 +47,7 @@ if [[ "${INTERVAL_SECONDS}" -lt 60 ]]; then
 fi
 
 if [[ -z "${TARGET_REPO_PATH}" ]]; then
-    echo "Usage: ./scripts/setup_windows_auto_commit.sh --repo /path/to/target/repo [--branch main] [--interval 60]" >&2
+    echo "Usage: ./scripts/setup_windows_auto_commit.sh --repo /path/to/target/repo [--branch master] [--interval 60]" >&2
     exit 1
 fi
 

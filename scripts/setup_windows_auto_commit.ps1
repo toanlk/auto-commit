@@ -1,7 +1,7 @@
 param(
     [string]$RepoPath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
     [string]$TaskName = "GitAutoCommitPush",
-    [string]$Branch = "main",
+    [string]$Branch = "master",
     [string]$Remote = "origin",
     [int]$IntervalSeconds = 60
 )

@@ -104,7 +104,7 @@ Mở PowerShell với quyền Administrator và chạy:
 
 ```powershell
 # Chạy script cài đặt kèm cấu hình đường dẫn thư mục Git cần commit
-.\scripts\setup_windows_auto_commit.ps1 -RepoPath "C:\duong-dan-den-repo" -Branch "main" -IntervalSeconds 60
+.\scripts\setup_windows_auto_commit.ps1 -RepoPath "C:\duong-dan-den-repo" -Branch "master" -IntervalSeconds 60
 ```
 
 Script này sẽ tự động:
@@ -115,11 +115,11 @@ Script này sẽ tự động:
 > [!NOTE]
 > - Nếu bạn sử dụng Command Prompt (`cmd.exe`), có thể gọi file wrapper:
 >   ```cmd
->   scripts\setup_windows_auto_commit.cmd -RepoPath "C:\duong-dan-den-repo" -Branch "main" -IntervalSeconds 60
+>   scripts\setup_windows_auto_commit.cmd -RepoPath "C:\duong-dan-den-repo" -Branch "master" -IntervalSeconds 60
 >   ```
 > - Nếu bạn chạy từ môi trường Git Bash trên Windows:
 >   ```bash
->   ./scripts/setup_windows_auto_commit.sh --repo /path/to/target/repo --branch main --interval 60
+>   ./scripts/setup_windows_auto_commit.sh --repo /path/to/target/repo --branch master --interval 60
 >   ```
 > - Nếu PowerShell báo lỗi phân quyền thực thi script, hãy chạy lệnh sau trước:
 >   `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`

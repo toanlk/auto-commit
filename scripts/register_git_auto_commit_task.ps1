@@ -3,7 +3,7 @@ param(
     [string]$RepoPath,
 
     [string]$TaskName = "GitAutoCommitPush",
-    [string]$Branch = "main",
+    [string]$Branch = "master",
     [string]$Remote = "origin",
     [int]$IntervalSeconds = 60,
     [string]$RunnerCommand = "poetry",
