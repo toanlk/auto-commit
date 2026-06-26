@@ -21,10 +21,55 @@ class AutoCommitConfig:
     branch: str | None = None
     commit_message_template: str = "Auto commit {timestamp}"
     push_when_clean: bool = False
+    filelist_limit: int = 5
 
-    def render_commit_message(self, now: datetime | None = None) -> str:
+    def render_commit_message(
+        self,
+        now: datetime | None = None,
+        summary: "DiffSummary | None" = None,
+    ) -> str:
         timestamp = (now or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-        return self.commit_message_template.format(timestamp=timestamp)
+        summary = summary or DiffSummary()
+        return self.commit_message_template.format(
+            timestamp=timestamp,
+            files=summary.files_label,
+            stats=summary.stats_label,
+            summary=summary.combined_label,
+            filelist=summary.filelist_label(self.filelist_limit),
+        )
+
+
+@dataclass(frozen=True)
+class DiffSummary:
+    file_count: int = 0
+    insertions: int = 0
+    deletions: int = 0
+    filenames: tuple[str, ...] = ()
+
+    @property
+    def files_label(self) -> str:
+        if self.file_count == 0:
+            return "no files"
+        noun = "file" if self.file_count == 1 else "files"
+        return f"{self.file_count} {noun}"
+
+    @property
+    def stats_label(self) -> str:
+        return f"+{self.insertions} -{self.deletions}"
+
+    @property
+    def combined_label(self) -> str:
+        if self.file_count == 0:
+            return "no changes"
+        return f"{self.files_label} ({self.stats_label})"
+
+    def filelist_label(self, limit: int) -> str:
+        if not self.filenames:
+            return ""
+        if limit <= 0 or len(self.filenames) <= limit:
+            return ", ".join(self.filenames)
+        shown = ", ".join(self.filenames[:limit])
+        return f"{shown} (+{len(self.filenames) - limit} more)"
 
 
 def run_git_command(repo_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -59,11 +104,43 @@ def stage_all_changes(repo_path: Path) -> None:
         raise GitAutoCommitError(stderr)
 
 
+def summarize_staged_changes(repo_path: Path) -> DiffSummary:
+    names = run_git_command(repo_path, "diff", "--cached", "--name-only")
+    filenames: tuple[str, ...] = ()
+    if names.returncode == 0:
+        filenames = tuple(line for line in names.stdout.splitlines() if line.strip())
+
+    shortstat = run_git_command(repo_path, "diff", "--cached", "--shortstat")
+    insertions = 0
+    deletions = 0
+    file_count = len(filenames)
+    if shortstat.returncode == 0:
+        text = shortstat.stdout.strip()
+        for token, target in (("insertion", "ins"), ("deletion", "del")):
+            for part in text.split(","):
+                part = part.strip()
+                if token in part:
+                    number = part.split()[0]
+                    if number.isdigit():
+                        if target == "ins":
+                            insertions = int(number)
+                        else:
+                            deletions = int(number)
+
+    return DiffSummary(
+        file_count=file_count,
+        insertions=insertions,
+        deletions=deletions,
+        filenames=filenames,
+    )
+
+
 def commit_changes(config: AutoCommitConfig, now: datetime | None = None) -> bool:
     if not has_staged_changes(config.repo_path):
         return False
 
-    message = config.render_commit_message(now=now)
+    summary = summarize_staged_changes(config.repo_path)
+    message = config.render_commit_message(now=now, summary=summary)
     result = run_git_command(config.repo_path, "commit", "-m", message)
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip() or "git commit failed."
@@ -97,6 +174,10 @@ def pull_changes(config: AutoCommitConfig, branch: str | None = None) -> None:
         raise GitAutoCommitError(stderr)
 
 
+def abort_rebase(repo_path: Path) -> None:
+    run_git_command(repo_path, "rebase", "--abort")
+
+
 def push_changes(config: AutoCommitConfig, branch: str | None = None) -> None:
     branch = branch or resolve_push_branch(config)
     result = run_git_command(config.repo_path, "push", config.remote, branch)
@@ -113,11 +194,16 @@ def run_cycle(
     ensure_git_repository(config.repo_path)
     branch = resolve_push_branch(config)
 
-    logger.info("Pulling from %s/%s.", config.remote, branch)
-    pull_changes(config, branch=branch)
-
     stage_all_changes(config.repo_path)
     committed = commit_changes(config, now=now)
+
+    logger.info("Pulling from %s/%s.", config.remote, branch)
+    try:
+        pull_changes(config, branch=branch)
+    except GitAutoCommitError as exc:
+        logger.error("Pull failed, aborting rebase: %s", exc)
+        abort_rebase(config.repo_path)
+        raise
 
     if committed:
         logger.info("Created commit and pushing to %s/%s.", config.remote, branch)
@@ -139,6 +225,9 @@ def run_loop(
     sleep_fn: Callable[[int], None] = time.sleep,
 ) -> None:
     while True:
-        run_cycle(config, logger)
+        try:
+            run_cycle(config, logger)
+        except GitAutoCommitError as exc:
+            logger.error("Cycle failed: %s", exc)
         logger.info("Sleeping for %s seconds.", config.interval_seconds)
         sleep_fn(config.interval_seconds)

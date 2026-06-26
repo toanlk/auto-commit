@@ -56,9 +56,11 @@ def test_run_cycle_commits_and_pushes() -> None:
         side_effect=[
             make_completed_process(0, stdout="true\n"),
             make_completed_process(0),
-            make_completed_process(0),
             make_completed_process(1),
+            make_completed_process(0, stdout="a.txt\n"),
+            make_completed_process(0, stdout=" 1 file changed, 2 insertions(+), 1 deletion(-)\n"),
             make_completed_process(0, stdout="[main abc] Auto commit"),
+            make_completed_process(0),
             make_completed_process(0, stdout="pushed"),
         ],
     ):
@@ -76,9 +78,11 @@ def test_run_cycle_pushes_current_branch_by_default() -> None:
             make_completed_process(0, stdout="true\n"),
             make_completed_process(0, stdout="develop\n"),
             make_completed_process(0),
-            make_completed_process(0),
             make_completed_process(1),
+            make_completed_process(0, stdout="a.txt\n"),
+            make_completed_process(0, stdout=" 1 file changed, 2 insertions(+)\n"),
             make_completed_process(0, stdout="[develop abc] Auto commit"),
+            make_completed_process(0),
             make_completed_process(0, stdout="pushed"),
         ],
     ) as runner:
@@ -86,6 +90,28 @@ def test_run_cycle_pushes_current_branch_by_default() -> None:
 
     assert changed is True
     assert runner.call_args_list[-1].args == (Path("."), "push", "origin", "develop")
+
+
+def test_run_cycle_aborts_rebase_on_pull_failure() -> None:
+    logger = logging.getLogger("test")
+    config = AutoCommitConfig(repo_path=Path("."), remote="origin", branch="main")
+    with patch(
+        "git_auto_commit.service.run_git_command",
+        side_effect=[
+            make_completed_process(0, stdout="true\n"),
+            make_completed_process(0),
+            make_completed_process(1),
+            make_completed_process(0, stdout="a.txt\n"),
+            make_completed_process(0, stdout=" 1 file changed, 1 insertion(+)\n"),
+            make_completed_process(0, stdout="[main abc] Auto commit"),
+            make_completed_process(1, stderr="merge conflict"),
+            make_completed_process(0),
+        ],
+    ) as runner:
+        with pytest.raises(GitAutoCommitError, match="merge conflict"):
+            run_cycle(config, logger, now=datetime(2026, 6, 23, 10, 11, 12))
+
+    assert runner.call_args_list[-1].args == (Path("."), "rebase", "--abort")
 
 
 def test_get_current_branch_raises_for_detached_head() -> None:

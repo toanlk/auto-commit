@@ -24,7 +24,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--message-template",
         default="Auto commit {timestamp}",
-        help="Commit message template. Supports {timestamp}.",
+        help=(
+            "Commit message template. Supports {timestamp}, {files}, {stats}, "
+            "{summary}, {filelist}."
+        ),
     )
     parser.add_argument(
         "--once",
